@@ -35,7 +35,7 @@ class SamPredictor:
         self,
         image: np.ndarray,
         image_format: str = "RGB",
-    ) -> None:
+    ) -> torch.Tensor:
         """
         Calculates the image embeddings for the provided image, allowing
         masks to be predicted with the 'predict' method.
@@ -58,6 +58,7 @@ class SamPredictor:
         input_image_torch = input_image_torch.permute(2, 0, 1).contiguous()[None, :, :, :]
 
         self.set_torch_image(input_image_torch, image.shape[:2])
+        return input_image_torch
 
     @torch.no_grad()
     def set_torch_image(
