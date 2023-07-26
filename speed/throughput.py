@@ -67,10 +67,21 @@ def main():
     input_point = np.array([[400, 400]])
     input_label = np.array([1])
 
-    masks, scores, logits = predictor.predict(point_coords=input_point,
-                                            point_labels=input_label,
-                                            multimask_output=True,
-                                            )
+    tic1 = time.time()
+    for _ in range(500):
+        masks, scores, logits = predictor.predict(point_coords=input_point,
+                                                point_labels=input_label,
+                                                multimask_output=True,
+                                                )
+        torch.cuda.synchronize()
+    tic2 = time.time()
+    print(
+        f"predict one seg throughput {500 / (tic2 - tic1)}"
+    )
+    print(
+        f"predict one seg latency {(tic2 - tic1) / 500 * 1000} ms"
+    )
+
     print("mask shape: ", masks.shape)
 
 if __name__ == "__main__":
