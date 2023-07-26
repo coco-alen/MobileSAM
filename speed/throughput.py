@@ -61,7 +61,7 @@ def main():
     input_image = sam.preprocess(input_image_torch)
     print(input_image.shape)
     # image encoder throughput
-    throughput(input_image, sam.image_encoder, repeat=50)
+    throughput(input_image, sam.image_encoder, repeat=100)
 
     # segmentation
     input_point = np.array([[400, 400]])

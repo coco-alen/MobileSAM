@@ -4,3 +4,6 @@
 __py
 **/__pycache__/
 *.egg-info
+*log
+*.tsv
+*.json

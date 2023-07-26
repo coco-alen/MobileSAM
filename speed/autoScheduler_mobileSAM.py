@@ -8,7 +8,6 @@ import pickle
 
 import tvm
 from tvm import relay
-from tvm import meta_schedule as ms
 from tvm import auto_scheduler
 
 from mobile_sam import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
@@ -35,22 +34,22 @@ def run_tuning(tasks, task_weights, log_file:str = "network.json", result_dir:st
     print("Begin tuning...")
     log_file = os.path.join(result_dir, log_file)
 
-    measure_ctx = auto_scheduler.LocalRPCMeasureContext(repeat=5, min_repeat_ms=25, timeout=10)
+    # measure_ctx = auto_scheduler.LocalRPCMeasureContext(repeat=5, min_repeat_ms=25, timeout=10)
 
-    # measure_ctx = auto_scheduler.RPCRunner( key = "3090",
-    #                                         host = "127.0.0.1",
-    #                                         port = 9190,
-    #                                         repeat=1,
-    #                                         min_repeat_ms=25,
-    #                                         n_parallel = 4,
-    #                                         timeout=15)
+    measure_ctx = auto_scheduler.RPCRunner( key = "3090",
+                                            host = "127.0.0.1",
+                                            port = 9190,
+                                            repeat=3,
+                                            min_repeat_ms=50,
+                                            n_parallel = 4,
+                                            timeout=15)
 
     tuner = auto_scheduler.TaskScheduler(tasks, task_weights)
     tune_option = auto_scheduler.TuningOptions(
         num_measure_trials=500000,
         early_stopping = 500,
         # runner = measure_ctx.runner,
-        runner=measure_ctx.runner,
+        runner=measure_ctx,
         measure_callbacks=[auto_scheduler.RecordToFile(log_file)],
     )
     tuner.tune(tune_option)
@@ -72,8 +71,18 @@ def main():
     input_image = sam.preprocess(input_image_torch)
     print(input_image.shape)
 
+
     task,task_weight = get_task(sam.image_encoder, input_image, target="cuda", cache_dir="./weights/tvm")
+
+    # start rpc server
+    os.system("./speed/RPCserver_start.sh")
     run_tuning(task, task_weight, log_file="tinyVit_imageEncoder.json", result_dir="./weights/tvm")
+
+    # kill rpc server
+    os.system("ps -ef | grep tvm.exec | grep -v grep | awk '{print $2}' | xargs kill -9")
 
 if __name__ == "__main__":
     main()
+
+
+    # python -u speed/autoScheduler_mobileSAM.py 2>&1 | tee speed/autoScheduler_mobileSAM.log
