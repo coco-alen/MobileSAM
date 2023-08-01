@@ -46,6 +46,9 @@ def main():
     model_type = "vit_t"
 
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint) # load model
+    # sam = sam_model_registry[model_type]() # load model
+    sam.eval()
+    sam.half()
     print(f"loaded model: \n {sam}")
 
     device = "cuda"
@@ -57,7 +60,7 @@ def main():
 
     # predict one label
     predictor = SamPredictor(sam)
-    input_image_torch = predictor.set_image(image)
+    input_image_torch = predictor.set_image(image).half()
     input_image = sam.preprocess(input_image_torch)
     print(input_image.shape)
     # image encoder throughput
@@ -67,22 +70,22 @@ def main():
     input_point = np.array([[400, 400]])
     input_label = np.array([1])
 
-    tic1 = time.time()
-    for _ in range(500):
-        masks, scores, logits = predictor.predict(point_coords=input_point,
-                                                point_labels=input_label,
-                                                multimask_output=True,
-                                                )
-        torch.cuda.synchronize()
-    tic2 = time.time()
-    print(
-        f"predict one seg throughput {500 / (tic2 - tic1)}"
-    )
-    print(
-        f"predict one seg latency {(tic2 - tic1) / 500 * 1000} ms"
-    )
+    # tic1 = time.time()
+    # for _ in range(500):
+    #     masks, scores, logits = predictor.predict(point_coords=input_point,
+    #                                             point_labels=input_label,
+    #                                             multimask_output=True,
+    #                                             )
+    #     torch.cuda.synchronize()
+    # tic2 = time.time()
+    # print(
+    #     f"predict one seg throughput {500 / (tic2 - tic1)}"
+    # )
+    # print(
+    #     f"predict one seg latency {(tic2 - tic1) / 500 * 1000} ms"
+    # )
 
-    print("mask shape: ", masks.shape)
+    # print("mask shape: ", masks.shape)
 
 if __name__ == "__main__":
     main()

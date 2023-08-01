@@ -17,6 +17,7 @@ from timm.models.layers import DropPath as TimmDropPath,\
 from timm.models.registry import register_model
 from typing import Tuple
 
+from flash_attn import flash_attn_qkvpacked_func, flash_attn_func
 
 class Conv2d_BN(torch.nn.Sequential):
     def __init__(self, a, b, ks=1, stride=1, pad=0, dilation=1,
@@ -272,6 +273,7 @@ class Attention(torch.nn.Module):
         k = k.permute(0, 2, 1, 3)
         v = v.permute(0, 2, 1, 3)
 
+        # original attention
         attn = (
             (q @ k.transpose(-2, -1)) * self.scale
             +
@@ -280,6 +282,10 @@ class Attention(torch.nn.Module):
         )
         attn = attn.softmax(dim=-1)
         x = (attn @ v).transpose(1, 2).reshape(B, N, self.dh)
+
+        # flash attention here
+        # x = flash_attn_func(q, k, v).transpose(1, 2).reshape(B, N, self.dh)
+
         x = self.proj(x)
         return x
 
