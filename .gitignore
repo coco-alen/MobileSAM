@@ -6,3 +6,6 @@ __py
 *.egg-info
 *.onnx
 *.png
+*log
+*.tsv
+*.json

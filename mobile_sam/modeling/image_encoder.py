@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from typing import Optional, Tuple, Type
 
 from .common import LayerNorm2d, MLPBlock
-
+from flash_attn import flash_attn_qkvpacked_func, flash_attn_func
 
 # This class and its supporting functions below lightly adapted from the ViTDet backbone available at: https://github.com/facebookresearch/detectron2/blob/main/detectron2/modeling/backbone/vit.py # noqa
 class ImageEncoderViT(nn.Module):
@@ -226,8 +226,9 @@ class Attention(nn.Module):
         # qkv with shape (3, B, nHead, H * W, C)
         qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
         # q, k, v with shape (B * nHead, H * W, C)
-        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
 
+        # original attention
+        q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
         attn = (q * self.scale) @ k.transpose(-2, -1)
 
         if self.use_rel_pos:
@@ -235,6 +236,11 @@ class Attention(nn.Module):
 
         attn = attn.softmax(dim=-1)
         x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
+
+        # flash attention
+        # q, k, v = qkv.reshape(3, B , self.num_heads, H * W, -1).unbind(0)
+        # x = flash_attn_func(q, k, v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
+
         x = self.proj(x)
 
         return x
