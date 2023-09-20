@@ -3,3 +3,6 @@
 *.pyd
 __py
 **/__pycache__/
+*.egg-info
+*.onnx
+*.png
