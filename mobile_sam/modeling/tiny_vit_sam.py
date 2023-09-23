@@ -17,7 +17,7 @@ from timm.models.layers import DropPath as TimmDropPath,\
 from timm.models.registry import register_model
 from typing import Tuple
 
-from flash_attn import flash_attn_qkvpacked_func, flash_attn_func
+# from flash_attn import flash_attn_qkvpacked_func, flash_attn_func
 
 class Conv2d_BN(torch.nn.Sequential):
     def __init__(self, a, b, ks=1, stride=1, pad=0, dilation=1,
