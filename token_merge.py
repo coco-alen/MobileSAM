@@ -53,6 +53,11 @@ def get_pupil_coord(image, threshold:int = None):
     image = image[eye_area*RATIO:(eye_area+5)*RATIO,:]
     frame = frame[eye_area*RATIO:(eye_area+5)*RATIO,:]
 
+    plt.figure(figsize=(10,10))
+    plt.imshow(frame)
+    plt.axis('on')
+    plt.savefig('./figure/input_image.png')
+
     # find pupil
     if threshold is None:        
         calibration = Calibration()
@@ -61,10 +66,15 @@ def get_pupil_coord(image, threshold:int = None):
     _, threshold = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY_INV)
     threshold = ClearBackGround(threshold) # floodFill to clear edge black area
 
+    plt.figure(figsize=(10,10))
+    plt.imshow(threshold)
+    plt.axis('on')
+    plt.savefig('./figure/input_image_2.png')
+
     # find the biggest Contours, assume it's the pupil
     contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[-2:]  
     contours = sorted(contours, key=lambda x: cv2.contourArea(x))
-    moments = cv2.moments(contours[-2])
+    moments = cv2.moments(contours[-1])
     pupil_x, pupil_y = int(moments['m10'] / moments['m00']), int(moments['m01'] / moments['m00'])
     coord = np.array([[pupil_x, pupil_y]])
     raw_coord = coord.copy()
@@ -72,33 +82,74 @@ def get_pupil_coord(image, threshold:int = None):
 
     return coord, raw_coord, image
 
+def get_mask(predictor, coord, image_resized, input_label):
+    ### MobileSAM ###
+    box = np.array([0, coord[0][1] - 100, image_resized.shape[1], coord[0][1] + 100])
 
+    predictor.set_image(image_resized, image_format="BGR")
+    # predictor.set_torch_image(image_resized, original_image_size = image_resized.shape[-2:])
+    masks, scores, logits = predictor.predict(
+        point_coords=coord,
+        point_labels=input_label,
+        multimask_output=True,
+        box=box,
+    )
+    return masks, scores, logits
+
+def latency_test(func, input, repeat=500, name="func"):
+    import time
+    # warm up
+    for _ in range(repeat//2):
+        func(*input)
+
+    start = time.time()
+    for _ in range(repeat):
+        func(*input)
+    end = time.time()
+    print(f"{name} latency: {(end-start)/repeat*1000} ms")
 
 
 def main():
-    image = cv2.imread('figure/eye3.png')
-    coord, raw_coord, image_resized = get_pupil_coord(image, 30)
+    image = cv2.imread('figure/eye5.png')
+    threshold = 40
+    coord, raw_coord, image_resized = get_pupil_coord(image, threshold)
 
     # print pupil location
-    print(coord)
+    # print(coord)
     input_label = np.array([1])
     plt.figure(figsize=(10,10))
     plt.imshow(image_resized)
     show_points(coord, input_label, plt.gca())
     plt.axis('on')
     plt.savefig('./figure/point_prompt.png')
+    print(image_resized.shape)
 
-
-    ### MobileSAM ###
     sam_checkpoint = "weights/mobile_sam.pt"
     model_type = "vit_t"
 
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = "cuda:5" if torch.cuda.is_available() else "cpu"
 
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=device)
     sam.eval()
 
     predictor = SamPredictor(sam)
-    predictor.set_image(image_resized, image_format="BGR")
+    # image_torch = predictor.set_image(image_resized, image_format="BGR")
 
+    masks, scores, logits = get_mask(predictor, coord, image_resized, input_label)
+
+    for i, (mask, score) in enumerate(zip(masks, scores)):
+        plt.figure(figsize=(10,10))
+        plt.imshow(image_resized)
+        show_mask(mask, plt.gca())
+        show_points(coord, input_label, plt.gca())
+        plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
+        plt.axis('off')  
+        plt.savefig(f'./figure/mask_{i+1}.png')
+
+    # print(masks.shape) # (number_of_masks) x H x W
+    # latency_test(func=get_pupil_coord, input=(image, threshold), name="get_pupil_coord")
+    # latency_test(func=get_mask, input=(predictor, coord, image_resized, input_label), name="get_mask")
+
+if __name__ == "__main__":
+    main()

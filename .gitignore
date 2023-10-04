@@ -9,3 +9,4 @@ __py
 *log
 *.tsv
 *.json
+*.pt
