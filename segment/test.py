@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dataset import transform
 import os
-from opt import parse_args
+from params import parse_args
 from models import model_dict
 from tqdm import tqdm
 from utils import get_predictions

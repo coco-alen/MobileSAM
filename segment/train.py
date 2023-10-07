@@ -6,18 +6,20 @@ Created on Mon Sep  2 11:22:32 2019
 @author: aayush
 """
 
-from models import model_dict
-from torch.utils.data import DataLoader 
-from dataset import IrisDataset
-import torch
-from utils import mIoU, CrossEntropyLoss2d,total_metric,get_nparams,Logger,GeneralizedDiceLoss,SurfaceLoss
-import numpy as np
-from dataset import transform
-from opt import parse_args
 import os
-from utils import get_predictions
+from copy import deepcopy
+
+import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader 
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch
+
+from dataset import transform, IrisDataset
+from params import parse_args
+from models import model_dict
+from utils import mIoU, CrossEntropyLoss2d, total_metric, get_nparams, Logger, GeneralizedDiceLoss, SurfaceLoss, get_predictions, ddp_init
 #%%
 
 def lossandaccuracy(loader,model,factor):
@@ -56,7 +58,9 @@ if __name__ == '__main__':
     args = parse_args()
     kwargs = vars(args)
 
-#    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  
+ 
+    # local_rank = args.local_rank
+    # ddp_init(local_rank)
 
     if args.useGPU:
         device=torch.device("cuda")
@@ -82,14 +86,16 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), '{}/models/dense_net{}.pt'.format(LOGDIR,'_0'))
     model.train()
     nparams = get_nparams(model)
+    # model_without_ddp = deepcopy(model)
+    # model = DDP(model, device_ids=[local_rank], output_device=local_rank)
     
-    try:
-        from torchsummary import summary
-        summary(model,input_size=(1,640,400))
-        print("Max params:", 1024*1024/4.0)
-        logger.write_summary(str(model.parameters))
-    except:
-        print ("Torch summary not found !!!")
+    # try:
+    #     from torchsummary import summary
+    #     summary(model,input_size=(1,640,400))
+    #     print("Max params:", 1024*1024/4.0)
+    #     logger.write_summary(str(model.parameters))
+    # except:
+    #     print ("Torch summary not found !!!")
     
     optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min',patience=5)
@@ -164,7 +170,7 @@ if __name__ == '__main__':
             
         ##save the model every epoch
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), '{}/models/dense_net{}.pkl'.format(LOGDIR,epoch))
+            torch.save(model.state_dict(), '{}/models/dense_net{}.pt'.format(LOGDIR,epoch))
 
         ##visualize the ouput every 5 epoch
         if epoch % 10 ==0:

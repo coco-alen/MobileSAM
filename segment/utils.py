@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+import torch.distributed as dist
 import cv2
 import os
 
@@ -227,3 +228,10 @@ class Logger():
         self.log_file.flush()
         print (msg)        
 
+
+
+def ddp_init(local_rank):
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend='nccl', init_method='env://')
+    dist.barrier()
+    torch.backends.cudnn.benchmark = True

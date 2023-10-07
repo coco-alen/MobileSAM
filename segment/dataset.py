@@ -78,7 +78,7 @@ def getRandomLine(xc, yc, theta):
 class Gaussian_blur(object):
     def __call__(self, img):
         sigma_value=np.random.randint(2, 7)
-        return Image.fromarray(cv2.GaussianBlur(img,(7,7),sigma_value))
+        return cv2.GaussianBlur(img,(7,7),sigma_value)
 
 class Translation(object):
     def __call__(self, base,mask):
@@ -171,7 +171,6 @@ class IrisDataset(Dataset):
         #Fixed gamma value for      
         table = 255.0*(np.linspace(0, 1, 256)**0.8)
         pilimg = cv2.LUT(image, table).astype(np.uint8)
-        print(pilimg)
 
         if self.split != 'test':
             labelpath = osp.join(self.filepath,'labels',self.list_files[idx]+'.npy')
@@ -192,9 +191,17 @@ class IrisDataset(Dataset):
                     pilimg, label = Translation()(pilimg, label)
     
         img = pilimg.astype(np.uint8)
-        img = self.clahe.apply(img)  
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
-        img = Image.fromarray(img)      
+        B,G,R = cv2.split(img)
+        clahe_B = self.clahe.apply(B)
+        clahe_G = self.clahe.apply(G)
+        clahe_R = self.clahe.apply(R)
+        img = cv2.merge((clahe_R,clahe_G,clahe_B))
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
+
+        img = Image.fromarray(img)   
+        if self.split != 'test':
+            label = Image.fromarray(label)   
+            
         if self.transform is not None:
             if self.split == 'train':
                 img, label = RandomHorizontalFlip()(img,label)
