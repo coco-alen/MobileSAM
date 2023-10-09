@@ -73,7 +73,7 @@ class GeneralizedDiceLoss(nn.Module):
     def forward(self, ip, target):
 
         # Rapid way to convert to one-hot. For future version, use functional
-        Label = (np.arange(4) == target.cpu().numpy()[..., None]).astype(np.uint8)
+        Label = (np.arange(2) == target.cpu().numpy()[..., None]).astype(np.uint8)
         target = torch.from_numpy(np.rollaxis(Label, 3,start=1)).cuda()
 
         assert ip.shape == target.shape
@@ -229,9 +229,9 @@ class Logger():
         print (msg)        
 
 
-
-def ddp_init(local_rank):
-    torch.cuda.set_device(local_rank)
-    dist.init_process_group(backend='nccl', init_method='env://')
-    dist.barrier()
-    torch.backends.cudnn.benchmark = True
+def tensor_rgb2gray(image):
+    # Input: (B, C, H, W)
+    # Output: (B, 1, H, W)
+    assert len(image.shape) == 4
+    assert image.shape[1] == 3
+    return 0.299*image[:, 0, :, :] + 0.587*image[:, 1, :, :] + 0.114*image[:, 2, :, :]

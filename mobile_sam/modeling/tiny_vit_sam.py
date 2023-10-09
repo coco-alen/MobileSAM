@@ -615,7 +615,7 @@ class TinyViT(nn.Module):
             x = layer(x)
         B,token ,C=x.size()
         dim = int(pow(token,0.5))
-        print(x.shape)
+        # print(x.shape)
         x = x.view(B, dim, dim, C)
         x=x.permute(0, 3, 1, 2)
         x=self.neck(x)

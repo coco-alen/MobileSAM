@@ -31,7 +31,7 @@ def show_box(box, ax):
 ### Original Image ###
 
 # image = cv2.imread('notebooks/images/picture1.jpg')
-image = cv2.imread('figure/eye.png')
+image = cv2.imread('figure/eye1.png')
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 plt.figure(figsize=(10,10))

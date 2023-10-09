@@ -80,7 +80,7 @@ class DenseNet2D_up_block_concat(nn.Module):
         return out
     
 class DenseNet2D(nn.Module):
-    def __init__(self,in_channels=3,out_channels=4,channel_size=32,concat=True,dropout=False,prob=0):
+    def __init__(self,in_channels=3,out_channels=2,channel_size=32,concat=True,dropout=False,prob=0):
         super(DenseNet2D, self).__init__()
 
         self.down_block1 = DenseNet2D_down_block(input_channels=in_channels,output_channels=channel_size,

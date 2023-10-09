@@ -177,6 +177,7 @@ class IrisDataset(Dataset):
             label = np.load(labelpath) 
             # label = np.resize(label,(W,H))
             label = label[eye_area * self.ratio:(eye_area+5) * self.ratio, :]
+            label[label>0] = 1
             # label = Image.fromarray(label)     
                
         if self.transform is not None:
@@ -201,7 +202,6 @@ class IrisDataset(Dataset):
         img = Image.fromarray(img)   
         if self.split != 'test':
             label = Image.fromarray(label)   
-            
         if self.transform is not None:
             if self.split == 'train':
                 img, label = RandomHorizontalFlip()(img,label)
@@ -216,7 +216,7 @@ class IrisDataset(Dataset):
             ##This is the implementation for the surface loss
             # Distance map for each class
             distMap = []
-            for i in range(0, 4):
+            for i in range(0, 2):
                 distMap.append(one_hot2dist(np.array(label)==i))
             distMap = np.stack(distMap, 0)           
 #            spatialWeights=np.float32(distMap) 

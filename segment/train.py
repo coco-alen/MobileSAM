@@ -14,12 +14,13 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader 
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torchvision.transforms as transforms
 import torch
 
 from dataset import transform, IrisDataset
 from params import parse_args
 from models import model_dict
-from utils import mIoU, CrossEntropyLoss2d, total_metric, get_nparams, Logger, GeneralizedDiceLoss, SurfaceLoss, get_predictions, ddp_init
+from utils import mIoU, CrossEntropyLoss2d, total_metric, get_nparams, Logger, GeneralizedDiceLoss, SurfaceLoss, get_predictions, tensor_rgb2gray
 #%%
 
 def lossandaccuracy(loader,model,factor):
@@ -159,6 +160,7 @@ if __name__ == '__main__':
     
             loss.backward()
             optimizer.step()
+            # break
             
         logger.write('Epoch:{}, Train mIoU: {}'.format(epoch,np.average(ious)))
         lossvalid , miou = lossandaccuracy(validloader,model,alpha[epoch])
@@ -174,9 +176,9 @@ if __name__ == '__main__':
 
         ##visualize the ouput every 5 epoch
         if epoch % 10 ==0:
-            os.makedirs('test/epoch/labels/',exist_ok=True)
-            os.makedirs('test/epoch/output/',exist_ok=True)
-            os.makedirs('test/epoch/mask/',exist_ok=True)
+            os.makedirs(f'{LOGDIR}/test/epoch/labels/',exist_ok=True)
+            os.makedirs(f'{LOGDIR}/test/epoch/output/',exist_ok=True)
+            os.makedirs(f'{LOGDIR}/test/epoch/mask/',exist_ok=True)
             
             with torch.no_grad():
                 for i, batchdata in tqdm(enumerate(testloader),total=len(testloader)):
@@ -184,10 +186,12 @@ if __name__ == '__main__':
                     data = img.to(device)       
                     output = model(data)            
                     predict = get_predictions(output)
+
+                    img = tensor_rgb2gray(img)
                     for j in range (len(index)):       
-                        np.save('test/epoch/labels/{}.npy'.format(index[j]),predict[j].cpu().numpy())
+                        np.save('{}/test/epoch/labels/{}.npy'.format(LOGDIR, index[j]),predict[j].cpu().numpy())
                         try:
-                            plt.imsave('test/epoch/output/{}.jpg'.format(index[j]),255*labels[j].cpu().numpy())
+                            plt.imsave('{}/test/epoch/output/{}.jpg'.format(LOGDIR, index[j]),255*labels[j].cpu().numpy())
                         except:
                             pass
                         pred_img = predict[j].cpu().numpy()/3.0
@@ -195,5 +199,5 @@ if __name__ == '__main__':
                         img_orig = np.clip(inp,0,1)
                         img_orig = np.array(img_orig)
                         combine = np.hstack([img_orig,pred_img])
-                        plt.imsave('test/epoch/mask/{}.jpg'.format(index[j]),combine)
+                        plt.imsave('{}/test/epoch/mask/{}.jpg'.format(LOGDIR, index[j]),combine)
 
