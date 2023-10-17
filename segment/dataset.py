@@ -259,7 +259,6 @@ class IrisDataset2020(Dataset):
             self.label_files = labels.split("\n")
             self.list_files=labels.replace("label_","").replace(".npy",".png").split("\n")
 
-        print(self.list_files)
 
         self.testrun = args.get('testrun')
         self.kernel = nn.Conv2d(1, 1, 5, stride=1, padding=0, bias=False)
@@ -278,7 +277,6 @@ class IrisDataset2020(Dataset):
 
     def preprocess_image(self, image):
         frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        print(frame.shape)
         # find eye area, filt out background
         frame_small = cv2.resize(frame, (8,5))  # resize to a small size , out shape is [5,8]
         torch_frame = torch.from_numpy(frame_small).to(torch.float32).unsqueeze(0).unsqueeze(0)
@@ -366,7 +364,7 @@ class IrisDataset2020(Dataset):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    ds = IrisDataset('/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset',split='test',transform=transform, kernel_weight="./logs/kernel_weight.pth")
+    # ds = IrisDataset('/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset',split='test',transform=transform, kernel_weight="./logs/kernel_weight.pth")
 # #    for i in range(1000):
 #     img, label, idx,x,y= ds[0]
 #     plt.subplot(121)
@@ -374,8 +372,8 @@ if __name__ == "__main__":
 #     plt.subplot(122)
 #     plt.imshow(np.array(img)[0,:,:],cmap='gray')
 
-    # ds = IrisDataset2020(filepath="/data/OpenEDS/OpenEDS/openEDS2020-SparseSegmentation", split="test", transform=transform, kernel_weight="./logs/kernel_weight.pth")
-    img, label, idx,x,y = ds[20]
+    ds = IrisDataset2020(filepath="/data/OpenEDS/OpenEDS/openEDS2020-SparseSegmentation", split="test", transform=transform, kernel_weight="./logs/kernel_weight.pth")
+    img, label, idx,x,y = ds[2]
     img = np.clip((img+1)*0.5, 0, 1)
     img = img.permute(1,2,0)
     img = np.array(img)

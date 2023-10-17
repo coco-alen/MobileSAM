@@ -6,7 +6,7 @@ Created on Mon Sep  2 11:37:59 2019
 @author: aaa
 """
 import torch
-from dataset import IrisDataset
+from dataset import IrisDataset, IrisDataset2020
 from torch.utils.data import DataLoader 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,9 +43,13 @@ if __name__ == '__main__':
     model = model.to(device)
     model.eval()
 
-    test_set = IrisDataset(filepath = '/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset/',\
+    # test_set = IrisDataset(filepath = '/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset/',\
+    #                              split = 'test',transform = transform, kernel_weight=args.kernel_path, resolution=args.res)
+
+
+    test_set = IrisDataset2020(filepath = '/data/OpenEDS/OpenEDS/openEDS2020-SparseSegmentation',\
                                  split = 'test',transform = transform, kernel_weight=args.kernel_path, resolution=args.res)
-    
+
     testloader = DataLoader(test_set, batch_size = args.bs,
                              shuffle=False, num_workers=2)
     counter=0
