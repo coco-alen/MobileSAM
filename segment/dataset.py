@@ -31,6 +31,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset 
 import torch.nn.functional as F
+import torch.nn as nn
 from torchvision.transforms.functional import resize, to_pil_image  # type: ignore
 from torchvision import transforms
 
@@ -126,7 +127,7 @@ class MaskToTensor(object):
 
   
 class IrisDataset(Dataset):
-    def __init__(self, filepath, split='train',transform=None,**args):
+    def __init__(self, filepath, split='train',transform=None, kernel_weight=None, resolution=400, **args):
         self.transform = transform
         self.filepath= osp.join(filepath,split)
         self.split = split
@@ -138,7 +139,13 @@ class IrisDataset(Dataset):
         self.list_files=listall
 
         self.testrun = args.get('testrun')
-        
+        self.kernel = nn.Conv2d(1, 1, 5, stride=1, padding=0, bias=False)
+        if kernel_weight is not None:
+            self.kernel.weight.data = torch.load(kernel_weight)
+        else:
+            self.kernel.weight.data = torch.ones([1,1,5,5])
+        self.resolution = (resolution, resolution)
+
         #PREPROCESSING STEP FOR ALL TRAIN, VALIDATION AND TEST INPUTS 
         #local Contrast limited adaptive histogram equalization algorithm
         self.clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
@@ -148,11 +155,10 @@ class IrisDataset(Dataset):
 
     def preprocess_image(self, image):
         frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
         # find eye area, filt out background
-        frame_small = cv2.resize(frame, (5,8))  # resize to a small size
+        frame_small = cv2.resize(frame, (5,8))  # resize to a small size, out shape is [8,5]
         torch_frame = torch.from_numpy(frame_small).to(torch.float32).unsqueeze(0).unsqueeze(0)
-        eye_area = int(F.conv2d(torch_frame, torch.ones([1,1,5,5]), stride=1, padding=0).squeeze().argmax()) # find the area lightest, assume it's the eye area
+        eye_area = int(self.kernel(torch_frame).squeeze().argmax()) # find the area lightest, assume it's the eye area
         image = image[eye_area * self.ratio:(eye_area+5) * self.ratio, :, :]
         return image, eye_area
 
@@ -199,8 +205,137 @@ class IrisDataset(Dataset):
         img = cv2.merge((clahe_R,clahe_G,clahe_B))
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
 
+        img = cv2.resize(img, self.resolution)
+        img = Image.fromarray(img) 
+
+        if self.split != 'test':
+            label = cv2.resize(label, self.resolution)
+            label = Image.fromarray(label)   
+        if self.transform is not None:
+            if self.split == 'train':
+                img, label = RandomHorizontalFlip()(img,label)
+            img = self.transform(img)    
+
+        if self.split != 'test':
+            ## This is for boundary aware cross entropy calculation
+            spatialWeights = cv2.Canny(np.array(label),0,3)/255
+            spatialWeights=cv2.dilate(spatialWeights,(3,3),iterations = 1)*20
+            
+            ##This is the implementation for the surface loss
+            # Distance map for each class
+            distMap = []
+            for i in range(0, 2):
+                distMap.append(one_hot2dist(np.array(label)==i))
+            distMap = np.stack(distMap, 0)           
+#            spatialWeights=np.float32(distMap) 
+            
+            
+        if self.split == 'test':
+            ##since label, spatialWeights and distMap is not needed for test images
+            return img,0,self.list_files[idx],0,0
+            
+        label = MaskToTensor()(label)
+        return img, label, self.list_files[idx],spatialWeights,np.float32(distMap) 
+
+
+
+class IrisDataset2020(Dataset):
+    def __init__(self, filepath, split='train',transform=None, kernel_weight=None, resolution=400, **args):
+        self.transform = transform
+        self.filepath= filepath
+        self.split = split
+        listall = []
+        
+        assert split in ['train', "validation", 'test'], 'split must be train_val or test'
+
+        if split == "test":
+            for file in os.listdir(osp.join(self.filepath,'selection')):   
+                if file.endswith(".png"):
+                    listall.append(file)
+            self.list_files=listall
+        elif split == "train" or split == "validation":
+            with open(osp.join(self.filepath, 'participant/labels.txt'), 'r') as f:
+                labels = f.read()
+            self.label_files = labels.split("\n")
+            self.list_files=labels.replace("label_","").replace(".npy",".png").split("\n")
+
+        print(self.list_files)
+
+        self.testrun = args.get('testrun')
+        self.kernel = nn.Conv2d(1, 1, 5, stride=1, padding=0, bias=False)
+        if kernel_weight is not None:
+            self.kernel.weight.data = torch.load(kernel_weight)
+        else:
+            self.kernel.weight.data = torch.ones([1,1,5,5])
+        self.resolution = (resolution, resolution)
+
+        #PREPROCESSING STEP FOR ALL TRAIN, VALIDATION AND TEST INPUTS 
+        #local Contrast limited adaptive histogram equalization algorithm
+        self.clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
+
+        self.ratio = 80
+
+
+    def preprocess_image(self, image):
+        frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        print(frame.shape)
+        # find eye area, filt out background
+        frame_small = cv2.resize(frame, (8,5))  # resize to a small size , out shape is [5,8]
+        torch_frame = torch.from_numpy(frame_small).to(torch.float32).unsqueeze(0).unsqueeze(0)
+        eye_area = int(self.kernel(torch_frame).squeeze().argmax()) # find the area lightest, assume it's the eye area
+        image = image[:, eye_area * self.ratio:(eye_area+5) * self.ratio, :]
+        return image, eye_area
+
+    def __len__(self):
+        if self.testrun:
+            return 10
+        return len(self.list_files)
+
+    def __getitem__(self, idx):
+        if self.split == "train" or self.split == "validation":
+            imagepath = osp.join(self.filepath,'participant',self.list_files[idx])
+            labelpath = osp.join(self.filepath,'participant',self.label_files[idx])
+        elif self.split == "test":
+            imagepath = osp.join(self.filepath,'selection',self.list_files[idx])
+        image = cv2.imread(imagepath)
+        # H, W = pilimg.width , pilimg.height
+        image, eye_area = self.preprocess_image(image)
+
+        #PREPROCESSING STEP FOR ALL TRAIN, VALIDATION AND TEST INPUTS 
+        #Fixed gamma value for      
+        table = 255.0*(np.linspace(0, 1, 256)**0.8)
+        pilimg = cv2.LUT(image, table).astype(np.uint8)
+
+        if self.split != 'test':
+            label = np.load(labelpath) 
+            # label = np.resize(label,(W,H))
+            label = label[:, eye_area * self.ratio:(eye_area+5) * self.ratio]
+            label[label>0] = 1
+            # label = Image.fromarray(label)     
+               
+        if self.transform is not None:
+            if self.split == 'train':
+                # if random.random() < 0.2: 
+                #     pilimg = Starburst_augment()(np.array(pilimg))  
+                if random.random() < 0.2: 
+                    pilimg = Line_augment()(pilimg) 
+                if random.random() < 0.2:
+                    pilimg = Gaussian_blur()(pilimg) 
+                if random.random() < 0.4:
+                    pilimg, label = Translation()(pilimg, label)
+    
+        img = pilimg.astype(np.uint8)
+        B,G,R = cv2.split(img)
+        clahe_B = self.clahe.apply(B)
+        clahe_G = self.clahe.apply(G)
+        clahe_R = self.clahe.apply(R)
+        img = cv2.merge((clahe_R,clahe_G,clahe_B))
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  
+
+        img = cv2.resize(img, self.resolution)
         img = Image.fromarray(img)   
         if self.split != 'test':
+            label = cv2.resize(label, self.resolution)
             label = Image.fromarray(label)   
         if self.transform is not None:
             if self.split == 'train':
@@ -231,10 +366,19 @@ class IrisDataset(Dataset):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    ds = IrisDataset('Semantic_Segmentation_Dataset',split='train',transform=transform)
-#    for i in range(1000):
-    img, label, idx,x,y= ds[0]
-    plt.subplot(121)
-    plt.imshow(np.array(label))
-    plt.subplot(122)
-    plt.imshow(np.array(img)[0,:,:],cmap='gray')
+    ds = IrisDataset('/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset',split='test',transform=transform, kernel_weight="./logs/kernel_weight.pth")
+# #    for i in range(1000):
+#     img, label, idx,x,y= ds[0]
+#     plt.subplot(121)
+#     plt.imshow(np.array(label))
+#     plt.subplot(122)
+#     plt.imshow(np.array(img)[0,:,:],cmap='gray')
+
+    # ds = IrisDataset2020(filepath="/data/OpenEDS/OpenEDS/openEDS2020-SparseSegmentation", split="test", transform=transform, kernel_weight="./logs/kernel_weight.pth")
+    img, label, idx,x,y = ds[20]
+    img = np.clip((img+1)*0.5, 0, 1)
+    img = img.permute(1,2,0)
+    img = np.array(img)
+
+    # plt.imsave("label.png", np.array(label))
+    plt.imsave("image.png", img)

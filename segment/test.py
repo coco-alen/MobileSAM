@@ -15,7 +15,7 @@ import os
 from params import parse_args
 from models import model_dict
 from tqdm import tqdm
-from utils import get_predictions
+from utils import get_predictions, tensor_rgb2gray
 #%%
 
 if __name__ == '__main__':
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     else:
         device=torch.device("cpu")
         
-    model = model_dict[args.model]
+    model = model_dict[args.model](sam_checkpoint="/data/hyou37/MobileSAM/weights/mobile_sam.pt", image_size=args.res)
     model  = model.to(device)
     filename = args.load
     if not os.path.exists(filename):
@@ -43,8 +43,8 @@ if __name__ == '__main__':
     model = model.to(device)
     model.eval()
 
-    test_set = IrisDataset(filepath = '/data/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset/',\
-                                 split = 'test',transform = transform)
+    test_set = IrisDataset(filepath = '/data/OpenEDS/OpenEDS/Openedsdata2019/Semantic_Segmentation_Dataset/',\
+                                 split = 'test',transform = transform, kernel_weight=args.kernel_path, resolution=args.res)
     
     testloader = DataLoader(test_set, batch_size = args.bs,
                              shuffle=False, num_workers=2)
@@ -60,6 +60,8 @@ if __name__ == '__main__':
             data = img.to(device)       
             output = model(data)            
             predict = get_predictions(output)
+
+            img = tensor_rgb2gray(img)
             for j in range (len(index)):       
                 np.save('test/labels/{}.npy'.format(index[j]),predict[j].cpu().numpy())
                 try:

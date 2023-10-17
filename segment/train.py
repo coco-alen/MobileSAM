@@ -82,7 +82,8 @@ if __name__ == '__main__':
     os.makedirs(LOGDIR+'/models',exist_ok=True)
     logger = Logger(os.path.join(LOGDIR,'logs.log'))
     
-    model = model_dict[args.model]
+    model = model_dict[args.model](sam_checkpoint="/data/hyou37/MobileSAM/weights/mobile_sam.pt", image_size=args.res)
+    print(model)
     model  = model.to(device)
     torch.save(model.state_dict(), '{}/models/dense_net{}.pt'.format(LOGDIR,'_0'))
     model.train()
@@ -107,10 +108,10 @@ if __name__ == '__main__':
     
     Path2file = args.dataset
     train = IrisDataset(filepath = Path2file,split='train',
-                             transform = transform, **kwargs)
+                             transform = transform, kernel_weight=args.kernel_path, resolution=args.res, **kwargs)
     
     valid = IrisDataset(filepath = Path2file , split='validation',
-                            transform = transform, **kwargs)
+                            transform = transform, kernel_weight=args.kernel_path, resolution=args.res, **kwargs)
     
     trainloader = DataLoader(train, batch_size = args.bs,
                              shuffle=True, num_workers = args.workers)
@@ -119,7 +120,7 @@ if __name__ == '__main__':
                              shuffle= False, num_workers = args.workers)
  
     test = IrisDataset(filepath = Path2file , split='test',
-                            transform = transform, **kwargs)
+                            transform = transform, kernel_weight=args.kernel_path, resolution=args.res, **kwargs)
     
     testloader = DataLoader(test, batch_size = args.bs,
                              shuffle=False, num_workers = args.workers)

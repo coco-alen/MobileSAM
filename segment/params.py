@@ -22,10 +22,13 @@ def parse_args():
     parser.add_argument('--testrun', action='store_true', help='test run with few dataset')
     parser.add_argument('--expname', type=str, default='info', help='extra explanation of the method')
     parser.add_argument('--useGPU', type=str, default=True, help='Set it as False if GPU is unavailable')
+    
+    parser.add_argument('--kernel_path', type=str, default=None, help='kernel weight path (should be a tensor)')
+    parser.add_argument('--res', type=int, default=400, help='image resolution for model input')
 
-    parser.add_argument('--world-size', default=-1, type=int,
-                        help='number of distributed processes')
-    parser.add_argument('--local-rank', default=-1, type=int)
+    # parser.add_argument('--world-size', default=-1, type=int,
+    #                     help='number of distributed processes')
+    # parser.add_argument('--local-rank', default=-1, type=int)
 
    
     # parse 

@@ -110,7 +110,8 @@ def latency_test(func, input, repeat=500, name="func"):
 
 
 def main():
-    image = cv2.imread('figure/eye5.png')
+    image = cv2.imread('figure/eye6.png')
+    print(image.shape)
     threshold = 40
     coord, raw_coord, image_resized = get_pupil_coord(image, threshold)
 
